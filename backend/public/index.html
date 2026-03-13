@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Systems – Proposal & Impact</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 1.5rem; background: #0f0f12; color: #e4e4e7; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .sub { color: #71717a; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section { background: #18181b; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.1rem; margin: 0 0 1rem; color: #a1a1aa; }
+    label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; color: #a1a1aa; }
+    input, textarea { width: 100%; padding: 0.5rem 0.6rem; margin-bottom: 0.75rem; border: 1px solid #3f3f46; border-radius: 6px; background: #27272a; color: #fff; font-size: 0.95rem; }
+    button { padding: 0.5rem 1rem; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; background: #3b82f6; color: #fff; }
+    button:hover { background: #2563eb; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .out { margin-top: 1rem; padding: 0.75rem; background: #27272a; border-radius: 6px; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
+    .err { color: #f87171; }
+    .row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .row input { margin-bottom: 0; flex: 1; }
+    .row input:first-of-type { flex: 2; }
+    .small { font-size: 0.8rem; color: #71717a; }
+  </style>
+</head>
+<body>
+  <h1>AI Systems</h1>
+  <p class="sub">B2B Proposal Generator & Impact Reporting</p>
+
+  <section>
+    <h2>Module 2: Proposal</h2>
+    <label>Event type</label>
+    <input id="event_type" type="text" value="Corporate conference" placeholder="e.g. Corporate conference" />
+    <label>Budget ($)</label>
+    <input id="budget" type="number" value="2000" min="1" />
+    <label>Sustainability goal</label>
+    <input id="sustainability_goal" type="text" value="reduce plastic waste" placeholder="e.g. reduce plastic waste" />
+    <button id="btnProposal">Generate proposal</button>
+    <div id="proposalOut" class="out" style="display:none;"></div>
+  </section>
+
+  <section>
+    <h2>Module 3: Impact report</h2>
+    <label>Order items <span class="small">(product, quantity, material)</span></label>
+    <div id="items">
+      <div class="row">
+        <input placeholder="Product" data-field="product" value="bamboo toothbrush" />
+        <input placeholder="Qty" type="number" data-field="quantity" value="100" style="max-width:80px" />
+        <input placeholder="Material" data-field="material" value="bamboo" />
+      </div>
+    </div>
+    <button type="button" id="btnAddRow">+ Add row</button>
+    <button id="btnImpact" style="margin-left:0.5rem">Generate impact</button>
+    <div id="impactOut" class="out" style="display:none;"></div>
+  </section>
+
+  <script>
+    const api = (path, body) => fetch('/api' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+    document.getElementById('btnProposal').onclick = async () => {
+      const out = document.getElementById('proposalOut');
+      out.style.display = 'block';
+      out.className = 'out';
+      out.textContent = 'Generating…';
+      document.getElementById('btnProposal').disabled = true;
+      try {
+        const r = await api('/proposal/generate', {
+          event_type: document.getElementById('event_type').value.trim(),
+          budget: Number(document.getElementById('budget').value) || 0,
+          sustainability_goal: document.getElementById('sustainability_goal').value.trim()
+        });
+        const data = await r.json();
+        if (data.success) {
+          out.textContent = JSON.stringify(data.data, null, 2);
+        } else {
+          out.textContent = (data.error || data.errors?.join?.(' ') || 'Error') + (data.errors ? '\n' + data.errors.join('\n') : '');
+          out.classList.add('err');
+        }
+      } catch (e) {
+        out.textContent = e.message || 'Request failed';
+        out.classList.add('err');
+      }
+      document.getElementById('btnProposal').disabled = false;
+    };
+
+    document.getElementById('btnAddRow').onclick = () => {
+      const div = document.createElement('div');
+      div.className = 'row';
+      div.innerHTML = '<input placeholder="Product" data-field="product" /><input placeholder="Qty" type="number" data-field="quantity" style="max-width:80px" value="0" /><input placeholder="Material" data-field="material" />';
+      document.getElementById('items').appendChild(div);
+    };
+
+    document.getElementById('btnImpact').onclick = async () => {
+      const rows = document.querySelectorAll('#items .row');
+      const order_items = Array.from(rows).map(row => ({
+        product: row.querySelector('[data-field="product"]').value.trim(),
+        quantity: Number(row.querySelector('[data-field="quantity"]').value) || 0,
+        material: row.querySelector('[data-field="material"]').value.trim() || undefined
+      })).filter(i => i.product || i.quantity > 0);
+      const out = document.getElementById('impactOut');
+      out.style.display = 'block';
+      out.className = 'out';
+      out.textContent = 'Generating…';
+      document.getElementById('btnImpact').disabled = true;
+      try {
+        const r = await api('/impact/generate', { order_items });
+        const data = await r.json();
+        if (data.success) {
+          out.textContent = JSON.stringify(data.data, null, 2);
+        } else {
+          out.textContent = (data.error || data.errors?.join?.(' ') || 'Error') + (data.errors ? '\n' + data.errors.join('\n') : '');
+          out.classList.add('err');
+        }
+      } catch (e) {
+        out.textContent = e.message || 'Request failed';
+        out.classList.add('err');
+      }
+      document.getElementById('btnImpact').disabled = false;
+    };
+  </script>
+</body>
+</html>
